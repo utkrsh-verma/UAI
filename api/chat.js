@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // Allow only POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST allowed" });
   }
@@ -7,9 +6,7 @@ export default async function handler(req, res) {
   try {
     const { message } = req.body;
 
-    if (!message) {
-      return res.status(400).json({ error: "Message missing" });
-    }
+    if (!message) return res.status(400).json({ error: "Message missing" });
 
     const systemPersona = `
 You are UAI.
@@ -30,35 +27,31 @@ Speak naturally, like a confident human.
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=AIzaSyD21RnhEXR7XOnY5j3VfUsMquidSHvr6gc",
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [
-            {
-              role: "user",
-              parts: [{ text: systemPersona }]
-            },
-            {
-              role: "user",
-              parts: [{ text: message }]
-            }
+            { role: "user", parts: [{ text: systemPersona }] },
+            { role: "user", parts: [{ text: message }] }
           ]
         })
       }
     );
 
+    // check if API responded
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini error:", errText);
+      const text = await response.text();
+      console.error("Gemini API ERROR:", text);
       return res.status(500).json({ error: "Gemini API failed" });
     }
 
     const data = await response.json();
 
+    console.log("Gemini response:", JSON.stringify(data, null, 2)); // DEBUG
+
     const reply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "I’m here, Utkarsh. Say that again.";
+      data?.candidates?.[0]?.content?.[0]?.text || // try content[0].text first
+      data?.candidates?.[0]?.content?.parts?.[0]?.text || // fallback
+      "UAI is thinking... but no reply received";
 
     return res.status(200).json({ reply });
 
