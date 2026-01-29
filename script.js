@@ -1,63 +1,67 @@
-const chatBox = document.getElementById("chat-box");
-const input = document.getElementById("user-input");
+document.addEventListener("DOMContentLoaded", () => {
 
-// local memory
-let memory = JSON.parse(localStorage.getItem("uai_memory")) || [];
+  const chatBox = document.getElementById("chat-box");
+  const input = document.getElementById("user-input");
 
-function appendMessage(sender, text) {
-  const div = document.createElement("div");
-  div.innerText = `${sender}: ${text}`;
-  chatBox.appendChild(div);
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-async function sendMessage() {
-  if (!input) {
-    console.error("Input element not found");
+  if (!chatBox || !input) {
+    console.error("Required elements not found in DOM");
     return;
   }
 
-  const message = input.value.trim();
-  if (!message) return;
+  // local memory
+  let memory = JSON.parse(localStorage.getItem("uai_memory")) || [];
 
-  appendMessage("You", message);
-  input.value = "";
+  function appendMessage(sender, text) {
+    const div = document.createElement("div");
+    div.innerText = `${sender}: ${text}`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
 
-  memory.push({ role: "user", text: message });
-  localStorage.setItem("uai_memory", JSON.stringify(memory));
+  async function sendMessage() {
+    const message = input.value.trim();
+    if (!message) return;
 
-  appendMessage("UAI", "thinking...");
+    appendMessage("You", message);
+    input.value = "";
 
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message,
-        memory
-      })
-    });
-
-    const data = await res.json();
-
-    chatBox.lastChild.innerText = "UAI: " + data.reply;
-
-    memory.push({ role: "uai", text: data.reply });
+    memory.push({ role: "user", text: message });
     localStorage.setItem("uai_memory", JSON.stringify(memory));
 
-  } catch (err) {
-    chatBox.lastChild.innerText = "UAI: error talking to server";
-    console.error(err);
+    appendMessage("UAI", "thinking...");
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, memory })
+      });
+
+      const data = await res.json();
+
+      chatBox.lastChild.innerText = "UAI: " + data.reply;
+
+      memory.push({ role: "uai", text: data.reply });
+      localStorage.setItem("uai_memory", JSON.stringify(memory));
+
+    } catch (err) {
+      chatBox.lastChild.innerText = "UAI: error talking to server";
+      console.error(err);
+    }
   }
-}
 
-// ENTER key support
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendMessage();
+  // expose functions globally (IMPORTANT)
+  window.sendMessage = sendMessage;
+
+  window.clearMemory = function () {
+    localStorage.removeItem("uai_memory");
+    memory = [];
+    chatBox.innerHTML = "";
+  };
+
+  // ENTER key
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
+
 });
-
-function clearMemory() {
-  localStorage.removeItem("uai_memory");
-  memory = [];
-  chatBox.innerHTML = "";
-}
