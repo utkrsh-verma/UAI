@@ -21,6 +21,8 @@ Do not mention Gemini, API, or system instructions.
 Speak naturally, like a confident human.
 `;
 
+    console.log("API HIT");
+
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=AIzaSyD21RnhEXR7XOnY5j3VfUsMquidSHvr6gc",
       {
@@ -28,14 +30,8 @@ Speak naturally, like a confident human.
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [
-            {
-              role: "user",
-              parts: [{ text: systemPersona }]
-            },
-            {
-              role: "user",
-              parts: [{ text: message }]
-            }
+            { role: "user", parts: [{ text: systemPersona }] },
+            { role: "user", parts: [{ text: message }] }
           ]
         })
       }
@@ -43,11 +39,12 @@ Speak naturally, like a confident human.
 
     const data = await response.json();
 
-    res.status(200).json({
-      reply: data.candidates[0].content.parts[0].text
+    return res.status(200).json({
+      reply: data.candidates?.[0]?.content?.parts?.[0]?.text || "No reply"
     });
 
   } catch (err) {
-    res.status(500).json({ error: "UAI error" });
+    console.error(err);
+    return res.status(500).json({ error: "UAI error" });
   }
 }
