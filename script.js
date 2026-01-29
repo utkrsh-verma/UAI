@@ -1,68 +1,63 @@
 const chatBox = document.getElementById("chat-box");
 const input = document.getElementById("user-input");
-const sendBtn = document.getElementById("send-btn");
 
-// local memory (browser)
-let memory = JSON.parse(localStorage.getItem("uai-memory")) || [];
+// local memory
+let memory = JSON.parse(localStorage.getItem("uai_memory")) || [];
+
+function appendMessage(sender, text) {
+  const div = document.createElement("div");
+  div.innerText = `${sender}: ${text}`;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
 
 async function sendMessage() {
-  const userMessage = input.value.trim();
-  if (!userMessage) return;
+  if (!input) {
+    console.error("Input element not found");
+    return;
+  }
 
-  // show user message
-  chatBox.innerHTML += `<div class="user">You: ${userMessage}</div>`;
+  const message = input.value.trim();
+  if (!message) return;
+
+  appendMessage("You", message);
   input.value = "";
 
-  // show thinking
-  const thinkingDiv = document.createElement("div");
-  thinkingDiv.className = "bot";
-  thinkingDiv.innerText = "UAI is thinking...";
-  chatBox.appendChild(thinkingDiv);
+  memory.push({ role: "user", text: message });
+  localStorage.setItem("uai_memory", JSON.stringify(memory));
 
-  // save to memory
-  memory.push({ role: "user", content: userMessage });
-  localStorage.setItem("uai-memory", JSON.stringify(memory));
+  appendMessage("UAI", "thinking...");
 
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: userMessage,
-        memory: memory
+        message,
+        memory
       })
     });
 
-    if (!res.ok) {
-      throw new Error("API failed");
-    }
-
     const data = await res.json();
 
-    // remove thinking
-    chatBox.removeChild(thinkingDiv);
+    chatBox.lastChild.innerText = "UAI: " + data.reply;
 
-    // show reply
-    chatBox.innerHTML += `<div class="bot">UAI: ${data.reply}</div>`;
+    memory.push({ role: "uai", text: data.reply });
+    localStorage.setItem("uai_memory", JSON.stringify(memory));
 
-    // save bot reply
-    memory.push({ role: "assistant", content: data.reply });
-    localStorage.setItem("uai-memory", JSON.stringify(memory));
-
-    chatBox.scrollTop = chatBox.scrollHeight;
   } catch (err) {
-    chatBox.removeChild(thinkingDiv);
-    chatBox.innerHTML += `<div class="bot error">Error: API not responding</div>`;
+    chatBox.lastChild.innerText = "UAI: error talking to server";
     console.error(err);
   }
 }
 
-// button click
-sendBtn.addEventListener("click", sendMessage);
-
-// enter to send
+// ENTER key support
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage();
 });
+
+function clearMemory() {
+  localStorage.removeItem("uai_memory");
+  memory = [];
+  chatBox.innerHTML = "";
+}
