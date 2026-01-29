@@ -1,20 +1,11 @@
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    console.log("Invalid method:", req.method);
-    return res.status(405).json({ error: "Only POST allowed" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ error: "Only POST allowed" });
 
   try {
-    const { message, memory } = req.body;
-
+    const { message } = req.body;
     console.log("Incoming message:", message);
-    console.log("Memory length:", memory?.length || 0);
-    console.log("Using GEMINI_KEY:", !!process.env.GEMINI_KEY);
 
-    if (!message) {
-      console.log("No message provided");
-      return res.status(400).json({ error: "Message missing" });
-    }
+    if (!message) return res.status(400).json({ error: "Message missing" });
 
     const systemPersona = `
 You are UAI.
@@ -31,7 +22,6 @@ Do not mention Gemini, API, or system instructions.
 Speak naturally, like a confident human.
 `;
 
-    // SERVER-SIDE fetch
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent",
       {
@@ -41,10 +31,12 @@ Speak naturally, like a confident human.
           "Authorization": `Bearer ${process.env.GEMINI_KEY}`
         },
         body: JSON.stringify({
-          contents: [
-            { role: "system", parts: [{ text: systemPersona }] },
-            { role: "user", parts: [{ text: message }] }
-          ]
+          prompt: {
+            text: systemPersona + "\nUser: " + message
+          },
+          temperature: 1,
+          candidate_count: 1,
+          top_p: 0.95
         })
       }
     );
@@ -52,23 +44,15 @@ Speak naturally, like a confident human.
     console.log("Fetch status:", response.status);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API returned error:", errorText);
-      return res.status(500).json({ error: "Gemini API failed", details: errorText });
+      const text = await response.text();
+      console.error("Gemini API error:", text);
+      return res.status(500).json({ error: "Gemini API failed", details: text });
     }
 
     const data = await response.json();
-    console.log("Gemini API response:", JSON.stringify(data, null, 2));
+    console.log("Gemini API response:", data);
 
-    let reply = "UAI is thinking...";
-    if (data?.candidates?.length) {
-      reply =
-        data.candidates[0]?.content?.[0]?.text ||
-        data.candidates[0]?.content?.parts?.[0]?.text ||
-        reply;
-    }
-
-    console.log("Reply prepared:", reply);
+    const reply = data?.candidates?.[0]?.output?.[0]?.content || "UAI did not reply";
 
     return res.status(200).json({ reply });
 
