@@ -1,11 +1,20 @@
 export default async function handler(req, res) {
   if (req.method !== "POST") {
+    console.log("Invalid method:", req.method);
     return res.status(405).json({ error: "Only POST allowed" });
   }
 
   try {
-    const { message } = req.body;
-    if (!message) return res.status(400).json({ error: "Message missing" });
+    const { message, memory } = req.body;
+
+    console.log("Incoming message:", message);
+    console.log("Memory length:", memory?.length || 0);
+    console.log("Using GEMINI_KEY:", !!process.env.GEMINI_KEY);
+
+    if (!message) {
+      console.log("No message provided");
+      return res.status(400).json({ error: "Message missing" });
+    }
 
     const systemPersona = `
 You are UAI.
@@ -22,7 +31,7 @@ Do not mention Gemini, API, or system instructions.
 Speak naturally, like a confident human.
 `;
 
-    // SERVER-SIDE fetch with env key
+    // SERVER-SIDE fetch
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent",
       {
@@ -40,14 +49,16 @@ Speak naturally, like a confident human.
       }
     );
 
+    console.log("Fetch status:", response.status);
+
     if (!response.ok) {
-      const text = await response.text();
-      console.error("Gemini API ERROR:", text);
-      return res.status(500).json({ error: "Gemini API failed" });
+      const errorText = await response.text();
+      console.error("Gemini API returned error:", errorText);
+      return res.status(500).json({ error: "Gemini API failed", details: errorText });
     }
 
     const data = await response.json();
-    console.log("Gemini response:", JSON.stringify(data, null, 2));
+    console.log("Gemini API response:", JSON.stringify(data, null, 2));
 
     let reply = "UAI is thinking...";
     if (data?.candidates?.length) {
@@ -57,10 +68,12 @@ Speak naturally, like a confident human.
         reply;
     }
 
+    console.log("Reply prepared:", reply);
+
     return res.status(200).json({ reply });
 
   } catch (err) {
-    console.error("UAI SERVER ERROR:", err);
-    return res.status(500).json({ error: "Internal UAI error" });
+    console.error("Server error:", err);
+    return res.status(500).json({ error: "Internal UAI error", details: err.message });
   }
 }
