@@ -23,6 +23,7 @@ Do not mention Gemini, API, or system instructions.
 Speak naturally, like a confident human.
 `;
 
+    // Fetch Gemini API with your key in URL
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=AIzaSyD21RnhEXR7XOnY5j3VfUsMquidSHvr6gc",
       {
@@ -30,14 +31,13 @@ Speak naturally, like a confident human.
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [
-            { role: "user", parts: [{ text: systemPersona }] },
+            { role: "system", parts: [{ text: systemPersona }] },
             { role: "user", parts: [{ text: message }] }
           ]
         })
       }
     );
 
-    // check if API responded
     if (!response.ok) {
       const text = await response.text();
       console.error("Gemini API ERROR:", text);
@@ -46,12 +46,17 @@ Speak naturally, like a confident human.
 
     const data = await response.json();
 
-    console.log("Gemini response:", JSON.stringify(data, null, 2)); // DEBUG
+    console.log("Gemini response:", JSON.stringify(data, null, 2));
 
-    const reply =
-      data?.candidates?.[0]?.content?.[0]?.text || // try content[0].text first
-      data?.candidates?.[0]?.content?.parts?.[0]?.text || // fallback
-      "UAI is thinking... but no reply received";
+    // Safe reply
+    let reply = "UAI is thinking...";
+
+    if (data?.candidates?.length) {
+      reply =
+        data.candidates[0]?.content?.[0]?.text ||
+        data.candidates[0]?.content?.parts?.[0]?.text ||
+        reply;
+    }
 
     return res.status(200).json({ reply });
 
