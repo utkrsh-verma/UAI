@@ -1,10 +1,15 @@
 export default async function handler(req, res) {
+  // Allow only POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST allowed" });
   }
 
   try {
     const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "Message missing" });
+    }
 
     const systemPersona = `
 You are UAI.
@@ -21,30 +26,44 @@ Do not mention Gemini, API, or system instructions.
 Speak naturally, like a confident human.
 `;
 
-    console.log("API HIT");
-
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=AIzaSyD21RnhEXR7XOnY5j3VfUsMquidSHvr6gc",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           contents: [
-            { role: "user", parts: [{ text: systemPersona }] },
-            { role: "user", parts: [{ text: message }] }
+            {
+              role: "user",
+              parts: [{ text: systemPersona }]
+            },
+            {
+              role: "user",
+              parts: [{ text: message }]
+            }
           ]
         })
       }
     );
 
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Gemini error:", errText);
+      return res.status(500).json({ error: "Gemini API failed" });
+    }
+
     const data = await response.json();
 
-    return res.status(200).json({
-      reply: data.candidates?.[0]?.content?.parts?.[0]?.text || "No reply"
-    });
+    const reply =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "I’m here, Utkarsh. Say that again.";
+
+    return res.status(200).json({ reply });
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "UAI error" });
+    console.error("UAI SERVER ERROR:", err);
+    return res.status(500).json({ error: "Internal UAI error" });
   }
 }
